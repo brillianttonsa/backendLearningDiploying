@@ -2,9 +2,18 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import pool  from './config/db.js';
 import session from 'express-session';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
+
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+
 
 
 app.set('view engine', 'ejs');
@@ -30,20 +39,20 @@ app.get('/signup', (req, res) => {
 });
 
 
-app.post('/signup', async (req,res) => {
-  const {username, password} = req.body;
+app.post('/signup', async (req, res) => {
+  const { username, password } = req.body;
+
+  // Hash the password (important!)
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  //save to db
-  try{
-    const result = await pool.query('INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id', [username, hashedPassword]);
-    req.session.userId = result.rows[0].id;
-  }catch (error) {
-    console.error('Error saving user to database:', error);
-    res.status(500).send('Internal Server Error');
-    return;
-  }
-})
+  // Insert into Supabase
+  const { data, error } = await supabase.from('users').insert([
+    { username, password: hashedPassword }
+  ]);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.status(200).json({ message: 'User registered successfully', data });
+});
 
 // Login page
 app.get('/login', (req, res) => {
